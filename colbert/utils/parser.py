@@ -37,6 +37,7 @@ class Arguments():
         self.add_argument('--checkpoint', dest='checkpoint', default=None, required=False)
 
         self.add_argument('--lr', dest='lr', default=3e-06, type=float)
+        self.add_argument('--epochs', dest='epochs', default=2, type=int)
         self.add_argument('--maxsteps', dest='maxsteps', default=400000, type=int)
         self.add_argument('--bsize', dest='bsize', default=32, type=int)
         self.add_argument('--accum', dest='accumsteps', default=2, type=int)
@@ -51,6 +52,7 @@ class Arguments():
         self.add_argument('--triples', dest='triples', required=True)
         self.add_argument('--queries', dest='queries', default=None)
         self.add_argument('--collection', dest='collection', default=None)
+        self.add_argument('--overwrite', action='store_true', default=False)
 
         def check_training_input(args):
             assert (args.collection is None) == (args.queries is None), \
@@ -107,7 +109,7 @@ class Arguments():
                           condition=(args.rank == 0))
             faiss.omp_set_num_threads(args.nthreads)
 
-        Run.init(args.rank, args.root, args.experiment, args.run)
+        Run.init(args.rank, args.root, args.experiment, args.run, overwrite=args.overwrite)
         Run._log_args(args)
         Run.info(args.input_arguments.__dict__, '\n')
 

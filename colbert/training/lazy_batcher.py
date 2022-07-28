@@ -1,4 +1,6 @@
 import os
+
+import torch
 import ujson
 
 from functools import partial
@@ -35,8 +37,10 @@ class LazyBatcher():
         with open(path) as f:
             for line_idx, line in enumerate(f):
                 if line_idx % nranks == rank:
-                    qid, pos, neg = ujson.loads(line)
-                    triples.append((qid, pos, neg))
+                    qid, pid, match = line.strip().split('\t')
+                    qid, match = int(qid), match == 'True'
+                    # qid, pos, neg = ujson.loads(line)
+                    triples.append((qid, pid, match))
 
         return triples
 
@@ -56,15 +60,19 @@ class LazyBatcher():
     def _load_collection(self, path):
         print_message("#> Loading collection...")
 
-        collection = []
+        collection = {} #[]
 
         with open(path) as f:
             for line_idx, line in enumerate(f):
-                pid, passage, title, *_ = line.strip().split('\t')
-                assert pid == 'id' or int(pid) == line_idx
+                pid, passage = line.strip().split('\t')
+                assert pid not in collection
+                collection[pid] = passage
 
-                passage = title + ' | ' + passage
-                collection.append(passage)
+                # pid, passage, title, *_ = line.strip().split('\t') # gg
+                # assert pid == 'id' or int(pid) == line_idx
+
+                # passage = title + ' | ' + passage
+                # collection.append(passage)
 
         return collection
 
@@ -81,22 +89,32 @@ class LazyBatcher():
         if offset + self.bsize > len(self.triples):
             raise StopIteration
 
-        queries, positives, negatives = [], [], []
+        # queries, positives, negatives = [], [], []
+        queries, passages, matches = [], [], []
 
         for position in range(offset, endpos):
-            query, pos, neg = self.triples[position]
-            query, pos, neg = self.queries[query], self.collection[pos], self.collection[neg]
+            qid, pid, is_match  = self.triples[position]
+            query, passage, = self.queries[qid], self.collection[pid],
 
             queries.append(query)
-            positives.append(pos)
-            negatives.append(neg)
+            passages.append(passage)
+            matches.append(is_match)
 
-        return self.collate(queries, positives, negatives)
+        return self.collate(queries, passages, matches)
 
-    def collate(self, queries, positives, negatives):
-        assert len(queries) == len(positives) == len(negatives) == self.bsize
+            # query, pos, neg = self.triples[position]
+            # query, pos, neg = self.queries[query], self.collection[pos], self.collection[neg]
+            #
+            # queries.append(query)
+            # positives.append(pos)
+            # negatives.append(neg)
 
-        return self.tensorize_triples(queries, positives, negatives, self.bsize // self.accumsteps)
+        # return self.collate(queries, positives, negatives)
+
+    def collate(self, queries, passages, matches):
+        assert len(queries) == len(passages) == len(matches) == self.bsize
+
+        return self.tensorize_triples(queries, passages, matches, self.bsize // self.accumsteps)
 
     def skip_to_batch(self, batch_idx, intended_batch_size):
         Run.warn(f'Skipping to batch #{batch_idx} (with intended_batch_size = {intended_batch_size}) for training.')

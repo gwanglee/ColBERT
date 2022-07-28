@@ -74,13 +74,14 @@ def train(args):
     optimizer.zero_grad()
 
     amp = MixedPrecisionManager(args.amp)
-    criterion = nn.CrossEntropyLoss()
-    labels = torch.zeros(args.bsize, dtype=torch.long, device=DEVICE)
+    # criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
+    # criterion = nn.BCELoss()
+
+    # labels = torch.zeros(args.bsize, dtype=torch.long, device=DEVICE)
 
     start_time = time.time()
     train_loss = 0.0
-
-    start_batch_idx = 0
 
     if args.resume:
         assert args.checkpoint is not None
@@ -88,17 +89,20 @@ def train(args):
 
         reader.skip_to_batch(start_batch_idx, checkpoint['arguments']['bsize'])
 
+    start_batch_idx = 0
+
     for batch_idx, BatchSteps in zip(range(start_batch_idx, args.maxsteps), reader):
         this_batch_loss = 0.0
 
-        for queries, passages in BatchSteps:
+        for queries, passages, matches in BatchSteps:
             with amp.context():
-                scores = colbert(queries, passages).view(2, -1).permute(1, 0)
-                loss = criterion(scores, labels[:scores.size(0)])
+                scores = colbert(queries, passages) #.view(2, -1).permute(1, 0)
+                loss = criterion(scores, matches.to('cuda'))
+                # loss = criterion(scores, labels[:scores.size(0)])
                 loss = loss / args.accumsteps
 
             if args.rank < 1:
-                print_progress(scores)
+                print_progress(scores, matches)
 
             amp.backward(loss)
 
@@ -121,3 +125,5 @@ def train(args):
 
             print_message(batch_idx, avg_loss)
             manage_checkpoints(args, colbert, optimizer, batch_idx+1)
+
+    manage_checkpoints(args, colbert, optimizer, batch_idx + 1, save=True)

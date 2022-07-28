@@ -25,7 +25,7 @@ class _RunManager():
         self._logger = None
         self.start_time = time.time()
 
-    def init(self, rank, root, experiment, name):
+    def init(self, rank, root, experiment, name, overwrite=False):
         assert '/' not in experiment, experiment
         assert '/' not in name, name
 
@@ -38,13 +38,17 @@ class _RunManager():
             if os.path.exists(self.path):
                 print('\n\n')
                 print_message("It seems that ", self.path, " already exists.")
-                print_message("Do you want to overwrite it? \t yes/no \n")
 
-                # TODO: This should timeout and exit (i.e., fail) given no response for 60 seconds.
+                if overwrite:
+                    print_message("It will be overwritten")
+                else:
+                    print_message("Do you want to overwrite it? \t yes/no \n")
 
-                response = input()
-                if response.strip() != 'yes':
-                    assert not os.path.exists(self.path), self.path
+                    # TODO: This should timeout and exit (i.e., fail) given no response for 60 seconds.
+
+                    response = input()
+                    if response.strip() != 'yes':
+                        assert not os.path.exists(self.path), self.path
             else:
                 create_directory(self.path)
 
